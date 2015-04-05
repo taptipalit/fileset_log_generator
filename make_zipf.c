@@ -52,7 +52,7 @@
 
 /* user-supplied parameters */
 static unsigned long random_seed = 40;
-static int library_size = 8000; 		/* number of videos available to be chosen. */
+static int library_size = 1000; 		/* number of videos available to be chosen. */
 static double zipf_exponent = -0.8;		/* exponent used to generate Zipf distribution */
 static double timeout_per_request = 10;		/* maximum time allowed to transmit a request to a client */
 static int num_buffering_requests = 3;		/* Number of client chunks to request at full speed before */
@@ -62,8 +62,8 @@ static int session_time_chunking = 1;		/* If greater than 1, session times will 
 static int video_time_chunking = 1;		/* If greater than 1, video times will be rounded to */
 						/* the nearest multiple of this number.		     */
 static int min_timeout = 10;			/* The minimum timeout to use for a session */
-static int num_log_files = 10;			/* number of client logs to create */
-static int num_log_sessions = 700;		/* number of sessions per log file */
+static int num_log_files = 3;			/* number of client logs to create */
+static int num_log_sessions = 200;		/* number of sessions per log file */
 static int num_sessions;			/* total number of video sessions = num_log_files * num_log_sessions */
 static int num_client_chunks_requested;		/* total number of client chunk requests */
 
@@ -144,9 +144,26 @@ typedef struct {
 
 /* filenames to used for different libraries */
 logfile_info_struct logfile_info[] = {
-    { "ada0-file-set/full-SD", "ada0-file-set/full-SD", 10000, 5, 0.5, 10 },
-    { "ada0-file-set/full-HD", "ada0-file-set/full-HD", 10000, 5, 2.5, 10 }
+    { "ada0-file-set/full-2040p", "ada0-file-set/full-2040p", 10000, 5, 50, 10 },
+    { "ada0-file-set/full-1440p", "ada0-file-set/full-1440p", 10000, 5, 12.5, 10 },
+    { "ada0-file-set/full-1080p", "ada0-file-set/full-1080p", 10000, 5, 10, 10 },
+    { "ada0-file-set/full-720p", "ada0-file-set/full-720p", 10000, 5, 6.25, 10 },
+    { "ada0-file-set/full-480p", "ada0-file-set/full-480p", 10000, 5, 3.125, 10 },
+    { "ada0-file-set/full-360p", "ada0-file-set/full-360p", 10000, 5, 1.25, 10 },
+    { "ada0-file-set/full-240p", "ada0-file-set/full-240p", 10000, 5, 0.5, 10 },
+    { "ada0-file-set/full-144p", "ada0-file-set/full-144p", 10000, 5, 0.1, 10 },
 };
+
+#define Q2040P 0
+#define Q1440P 1
+#define Q1080P 2
+#define Q720P 3
+#define Q480P 4
+#define Q360P 5
+#define Q240P 6
+#define Q144P 7
+
+int video_quality = Q480P;
 
 /* information about each file in a fileset */
 struct fs_info_struct;
@@ -493,11 +510,14 @@ static fileset_info_struct *create_video_library( int lib_size )
 	exit( 1 );
     }
     fsi->num_files = lib_size;
+    /*
 #ifdef HD_VIDEO
     fsi->li = &(logfile_info[ HD_LIBRARY ]);
 #else
     fsi->li = &(logfile_info[ SD_LIBRARY ]);
 #endif
+    */
+    fsi->li = &(logfile_info[ video_quality ]);
     fsi->file_MB_rate = fsi->li->client_MB_per_request / fsi->li->file_seconds_per_request;
 
     total_duration = 0.0;
@@ -900,17 +920,21 @@ int main(int argc, char *argv[])
 	make_video_index( fileset_list[0] );
 	num_videos = library_size;
 	
+	/*
 #ifdef HD_VIDEO
 	fileset_list[0]->li = &(logfile_info[ HD_LIBRARY ]);
 #else
 	fileset_list[0]->li = &(logfile_info[ SD_LIBRARY ]);
 #endif
+	*/
+	fileset_list[0]->li = &(logfile_info[ video_quality ]);
     }
     else {
 	for (i=0;i<num_filesets;++i) {
 
 	    /* examine fileset name to determine what logfile information to use */
 	    c = argv[i+1];
+	    /*
 	    j = SD_LIBRARY;
 	    while (*c) {
 		if (*c == 'H' && *(c + 1) == 'D') {
@@ -922,8 +946,8 @@ int main(int argc, char *argv[])
 		    break;
 		}
 		c++;
-	    }
-	    log_info = &logfile_info[j];
+		}*/
+	    log_info = &logfile_info[video_quality];
 
 	    if ((fileset_list[i] = read_video_library( argv[i+1], log_info, &num_videos )) == NULL) {
 		printf( "Error reading video library %s.\n", argv[i+1] );
