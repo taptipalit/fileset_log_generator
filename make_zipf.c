@@ -44,11 +44,11 @@
 #define VBR_FACTOR (0.1)
 
 /* use HD video speeds of 2 Mbps rather than SD 400 kbps */
-//#define HD_VIDEO
+#define HD_VIDEO
 
 /* use a combination of HD and SD, as calculated in compute_fileset() */
 /* set the proportion of SD videos (MIXED_SD_PROBABILITY) below.      */
-#define MIXED_VIDEO
+//#define MIXED_VIDEO
 
 /* user-supplied parameters */
 static unsigned long random_seed = 40;
@@ -63,7 +63,7 @@ static int video_time_chunking = 1;		/* If greater than 1, video times will be r
 						/* the nearest multiple of this number.		     */
 static int min_timeout = 10;			/* The minimum timeout to use for a session */
 static int num_log_files = 3;			/* number of client logs to create */
-static int num_log_sessions = 200;		/* number of sessions per log file */
+static int num_log_sessions = 100;		/* number of sessions per log file */
 static int num_sessions;			/* total number of video sessions = num_log_files * num_log_sessions */
 static int num_client_chunks_requested;		/* total number of client chunk requests */
 
@@ -77,13 +77,13 @@ static double ramp_down_frac = 0.6;		/* after this fraction of the sessions have
 #endif
 
 /* set to ignore popularity and simply read each file in the library a single time */
-//#define SINGLE_REQUESTS
+//#define SINGLE_REQUESTS @Tapti
 
 /* create all the files in the library and save to video_files.txt, even if the video is never viewed */
 //#define CREATE_FULL_LIBRARY
 
 /* make all sessions last the full duration of the video */
-//#define FULL_SESSIONS
+#define FULL_SESSIONS // @Tapti
 
 /* start requests from an offset other than 0.  If FIXED, add a */
 /* fixed amount.  If MIDPOINT, make request out of the middle of */
@@ -126,6 +126,8 @@ static char log_basename[] = "cl-ada0-SD-0.2";
 static char preload_basename[] = "fs-ada0-SD-0.2";
 #endif
 
+#define MIXED_SD_PROBABILITY	(0.83)
+
 /* types of file sets */
 typedef enum {
     SD_LIBRARY = 0,
@@ -143,6 +145,7 @@ typedef struct {
 } logfile_info_struct;
 
 /* filenames to used for different libraries */
+
 logfile_info_struct logfile_info[] = {
     { "ada0-file-set/full-2040p", "ada0-file-set/full-2040p", 10000, 5, 50, 10 },
     { "ada0-file-set/full-1440p", "ada0-file-set/full-1440p", 10000, 5, 12.5, 10 },
@@ -154,6 +157,7 @@ logfile_info_struct logfile_info[] = {
     { "ada0-file-set/full-144p", "ada0-file-set/full-144p", 10000, 5, 0.1, 10 },
 };
 
+
 #define Q2040P 0
 #define Q1440P 1
 #define Q1080P 2
@@ -163,7 +167,7 @@ logfile_info_struct logfile_info[] = {
 #define Q240P 6
 #define Q144P 7
 
-int video_quality = Q480P;
+int video_quality = Q720P;
 
 /* information about each file in a fileset */
 struct fs_info_struct;
@@ -1034,9 +1038,10 @@ int main(int argc, char *argv[])
 
 #ifdef SINGLE_REQUESTS
 	/* assign videos in the order of the permutation */
-        if (svs->num_unique >= fileset_info->num_files) {
-	    printf( "Not enough videos in file set (%d) to represent all unique videos.\n",
-			fileset_info->num_files  );
+        //printf("number of unique files = %d", svs->num_unique);
+        if (svs->num_unique > fileset_info->num_files) {
+	    printf( "Not enough videos in file set (%d) to represent all unique videos (%d).\n",
+			fileset_info->num_files, svs->num_unique  );
 	    exit( 1 );
 	}
         rank = fileset_info->permutation[svs->num_unique];

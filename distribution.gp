@@ -11,6 +11,6 @@ set mytics 10
 set size 1.0,0.75
 unset key
 set logscale xy
-set title "Popularity Distribution - `cat make_zipf_description.txt`"
+set title "Popularity Distribution"
 plot \
    'distribution.txt' using 1:2 axes x1y1 title 'generated' with lines linetype 2 linewidth 4
