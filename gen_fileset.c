@@ -81,7 +81,10 @@ int main(int argc, char *argv[])
 	if (count++ % 50 == 0) { 
 	    printf( "%s %d %.3f seconds\n", filename, file_bytes, file_time );
 	}
-	create_file( filename, file_bytes );
+	if (create_file( filename, file_bytes ) != 0) {
+		fprintf(stderr, "Error creating file. Exiting ...\n");
+		exit(1);	
+        }
 	curr = fgets( file_line, sizeof( file_line ), f );
     }
     exit( 0 );

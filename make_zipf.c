@@ -52,7 +52,7 @@
 
 /* user-supplied parameters */
 static unsigned long random_seed = 40;
-static int library_size = 1000; 		/* number of videos available to be chosen. */
+static int library_size = 100; 		/* number of videos available to be chosen. */
 static double zipf_exponent = -0.8;		/* exponent used to generate Zipf distribution */
 static double timeout_per_request = 10;		/* maximum time allowed to transmit a request to a client */
 static int num_buffering_requests = 3;		/* Number of client chunks to request at full speed before */
@@ -63,7 +63,7 @@ static int video_time_chunking = 1;		/* If greater than 1, video times will be r
 						/* the nearest multiple of this number.		     */
 static int min_timeout = 10;			/* The minimum timeout to use for a session */
 static int num_log_files = 3;			/* number of client logs to create */
-static int num_log_sessions = 100;		/* number of sessions per log file */
+static int num_log_sessions = 20;		/* number of sessions per log file */
 static int num_sessions;			/* total number of video sessions = num_log_files * num_log_sessions */
 static int num_client_chunks_requested;		/* total number of client chunk requests */
 
