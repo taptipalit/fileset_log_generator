@@ -43,12 +43,7 @@
 /* adjust chunk size by plus or minus this fraction */
 #define VBR_FACTOR (0.1)
 
-/* use HD video speeds of 2 Mbps rather than SD 400 kbps */
-#define HD_VIDEO
 
-/* use a combination of HD and SD, as calculated in compute_fileset() */
-/* set the proportion of SD videos (MIXED_SD_PROBABILITY) below.      */
-//#define MIXED_VIDEO
 
 /* user-supplied parameters */
 static unsigned long random_seed = 40;
@@ -70,20 +65,6 @@ static int num_client_chunks_requested;		/* total number of client chunk request
 static double max_duration = 800;		/* video library durations are truncated to this value when read */
 static double max_session;			/* duration of the longest session that was used, in seconds */
 
-// #define RAMP_DOWN
-#ifdef RAMP_DOWN
-static double ramp_down_frac = 0.6;		/* after this fraction of the sessions have been processed, */
-						/* ramp down the maximum session length for the remainder.  */
-#endif
-
-/* set to ignore popularity and simply read each file in the library a single time */
-//#define SINGLE_REQUESTS @Tapti
-
-/* create all the files in the library and save to video_files.txt, even if the video is never viewed */
-//#define CREATE_FULL_LIBRARY
-
-/* make all sessions last the full duration of the video */
-#define FULL_SESSIONS // @Tapti
 
 /* start requests from an offset other than 0.  If FIXED, add a */
 /* fixed amount.  If MIDPOINT, make request out of the middle of */
@@ -102,37 +83,10 @@ static double average_video_MB;			/* Calculated average size of videos in MB */
 static char header_line[MAX_HEADER_LINES][HEADER_LINE_LENGTH];
 static int num_header_lines;
 
-/* information about the names of the log files and preload files */
-#ifdef FULL_SESSIONS
-static char log_basename[] = "cl-ada0-SD-0.2-full";
-static char preload_basename[] = "fs-ada0-SD-0.2-full";
-#elif defined( SINGLE_REQUESTS )
-#ifdef HD_VIDEO
-static char log_basename[] = "cl-ada0-HD-single";
-static char preload_basename[] = "fs-ada0-HD-single";
-#else
-static char log_basename[] = "cl-ada0-SD-single";
-static char preload_basename[] = "fs-ada0-SD-single";
-#endif
-#elif defined( MIXED_VIDEO )
-#define MIXED_SD_PROBABILITY	(0.83)
-static char log_basename[] = "cl-ada0-mix-0.83-0.8";
-static char preload_basename[] = "fs-ada0-mix-0.83-0.8";
-#elif defined( HD_VIDEO )
-static char log_basename[] = "cl-ada0-HD-0.2";
-static char preload_basename[] = "fs-ada0-HD-0.2";
-#else
-static char log_basename[] = "cl-ada0-SD-0.2";
-static char preload_basename[] = "fs-ada0-SD-0.2";
-#endif
+static char log_basename[] = "cl";
+static char preload_basename[] = "fs";
 
-#define MIXED_SD_PROBABILITY	(0.83)
 
-/* types of file sets */
-typedef enum {
-    SD_LIBRARY = 0,
-    HD_LIBRARY = 1
-} fileset_type;
 
 /* information used to create names in the logfiles */
 typedef struct {
@@ -147,14 +101,14 @@ typedef struct {
 /* filenames to used for different libraries */
 
 logfile_info_struct logfile_info[] = {
-    { "ada0-file-set/full-2040p", "ada0-file-set/full-2040p", 10000, 5, 50, 10 },
-    { "ada0-file-set/full-1440p", "ada0-file-set/full-1440p", 10000, 5, 12.5, 10 },
-    { "ada0-file-set/full-1080p", "ada0-file-set/full-1080p", 10000, 5, 10, 10 },
-    { "ada0-file-set/full-720p", "ada0-file-set/full-720p", 10000, 5, 6.25, 10 },
-    { "ada0-file-set/full-480p", "ada0-file-set/full-480p", 10000, 5, 3.125, 10 },
-    { "ada0-file-set/full-360p", "ada0-file-set/full-360p", 10000, 5, 1.25, 10 },
-    { "ada0-file-set/full-240p", "ada0-file-set/full-240p", 10000, 5, 0.5, 10 },
-    { "ada0-file-set/full-144p", "ada0-file-set/full-144p", 10000, 5, 0.1, 10 },
+    { "full-2040p", "full-2040p", 10000, 5, 50, 10 },
+    { "full-1440p", "full-1440p", 10000, 5, 12.5, 10 },
+    { "full-1080p", "full-1080p", 10000, 5, 10, 10 },
+    { "full-720p", "full-720p", 10000, 5, 6.25, 10 },
+    { "full-480p", "full-480p", 10000, 5, 3.125, 10 },
+    { "full-360p", "full-360p", 10000, 5, 1.25, 10 },
+    { "full-240p", "full-240p", 10000, 5, 0.5, 10 },
+    { "full-144p", "full-144p", 10000, 5, 0.1, 10 },
 };
 
 
@@ -188,12 +142,7 @@ typedef struct fs_info_struct {
     int *video_index;		/* index of videos, in rank order */
     logfile_info_struct	*li;	/* information used to create log file entries */
     double file_MB_rate;	/* data rate of video files, in MB/s */
-#ifdef SINGLE_REQUESTS
-    int *permutation;		/* when requesting single files, use a permutation to */
-				/* select videos rather than a pdf */
-#else
     double *pdf;		/* popularity distribution function for the fileset */
-#endif
 } fileset_info_struct;
 
 /* information about sessions making up the workload */
@@ -220,26 +169,6 @@ static void write_file_duration_CDF( void );
 
 /* PDF of video duration, or time to read entire video.		    	     */
 /* This is the combination of 4 normal curves with the following parameters: */
-#ifdef GENERATE_DURATION
-#define NUM_NORMAL_CURVES 4
-/* These are the parameters from [Cheng. YouTube Case Study] */
-static double video_duration_mean[NUM_NORMAL_CURVES] = { 16, 208, 583, 295 };
-static double video_duration_sigma[NUM_NORMAL_CURVES] = { 62, 58, 16, 172 };
-static double video_duration_frac[NUM_NORMAL_CURVES] = { 0.486, 0.262, 0.027, 0.225 };
-
-#ifdef OLDWAY
-/* I fiddled with the first curve to match [Abhari. Workload Generation for YouTube] */
-static double video_duration_mean[NUM_NORMAL_CURVES] = { 70, 208, 583, 295 };
-static double video_duration_sigma[NUM_NORMAL_CURVES] = { 35, 58, 16, 172 };
-static double video_duration_frac[NUM_NORMAL_CURVES] = { 0.07, 0.262, 0.027, 0.225 };
-#endif
-#define VIDEO_DUR_SIZE 50
-static double video_duration_cdf[VIDEO_DUR_SIZE];
-static double video_duration[VIDEO_DUR_SIZE];
-#define PI 3.14159265
-
-#else /* !defined( GENERATE_DURATION ) */
-
 #define VIDEO_DUR_SIZE 25
 static double video_duration_cdf[VIDEO_DUR_SIZE] = { 0.018, 0.057, 0.109, 0.160, 0.202, 0.247, 0.296, 0.346, 0.395, 0.439,
 						0.494, 0.544, 0.597, 0.642, 0.692, 0.723, 0.791, 0.817, 0.874, 0.928,
@@ -248,7 +177,6 @@ static double video_duration[VIDEO_DUR_SIZE] = { 15, 30, 50, 70, 90, 112, 138, 1
 						215, 228, 244, 257, 285, 300, 362, 400, 500, 600,
 						700, 800, 900, 1000, 1000 };
 
-#endif
 
 /*
  * Find the first cdf value higher than r. Interpolate r between the two straddling
@@ -279,65 +207,6 @@ static double interpolate_cdf( double r,	     /* random number between 0 and 1 *
     }
 }
 
-/*
- * create cdf of file durations, from the normal curves
- */
-static void init_compute_duration( void )
-{
-#ifdef GENERATE_DURATION
-    int i, j;
-    double sigma2;
-    double m;
-    double duration, step;
-    double total_prob;
-
-/* The PDF covers durations up to 700, which is 99.1 % of the data */
-#define VIDEO_DUR_PDF_TIME 700.0
-#define VIDEO_DUR_PDF_FRAC 0.991
-
-/* Use 1000 second duration to represent data outside the PDF */
-#define VIDEO_DUR_MAX_TIME 1000.0
-
-    /* initialize durations we will sample at */
-    step = VIDEO_DUR_PDF_TIME / VIDEO_DUR_SIZE;
-    duration = step / 2;
-    for (j=0;j<VIDEO_DUR_SIZE;++j) {
-	video_duration[j] = duration;
-	duration += step;
-	video_duration_cdf[j] = 0.0;
-    }
-	
-    /* compute pdf by aggregating 4 normal curves */
-    for (i=0;i<NUM_NORMAL_CURVES;++i) {
-	sigma2 = video_duration_sigma[i] * video_duration_sigma[i];
-	m = video_duration_frac[i] * pow( 2 * PI * sigma2, -0.5 );
-	for (j=0;j<VIDEO_DUR_SIZE;++j) {
-	    duration = video_duration[j] - video_duration_mean[i];
-	    video_duration_cdf[j] += m * exp( duration * duration / (-2.0 * sigma2));
-	}
-    }
-
-    /* reduce the probability of the first two bins, since most popularity distributions have few really short videos */
-    video_duration_cdf[0] /= 8;
-    video_duration_cdf[1] /= 2;
-
-    /* convert pdf to a normalized cdf.  The PDF accounts for most of the data, */
-    /* but add a final duration of 1000 to represent the durations > 700.	*/
-    total_prob = 0.0;
-    for (j=0;j<VIDEO_DUR_SIZE;++j) {
-	total_prob += video_duration_cdf[j];
-    }
-    total_prob /= VIDEO_DUR_PDF_FRAC;
-    video_duration_cdf[0] /= total_prob;
-    for (j=1;j<VIDEO_DUR_SIZE-1;++j) {
-	video_duration_cdf[j] = video_duration_cdf[j] / total_prob + video_duration_cdf[j-1];
-    }
-
-    /* add final large duration */
-    video_duration_cdf[VIDEO_DUR_SIZE - 1] = 1.0;
-    video_duration[VIDEO_DUR_SIZE - 1] = VIDEO_DUR_MAX_TIME;
-#endif
-}
 
 #define MINIMUM_DURATION 5
 #define VIDEO_DUR_HISTOGRAM_SIZE 1000
@@ -369,23 +238,12 @@ static double compute_duration( double r )
 }
 
 /* CDF of session lengths.  This is the fraction of a full file that will be read. */
-#ifdef OLDWAY
-#define SESSION_FRAC_SIZE 27
-static double session_frac_cdf[SESSION_FRAC_SIZE] = { 0.040, 0.080, 0.120, 0.160, 0.200, 0.240, 0.280, 0.320, 0.360, 0.400,
-						    0.440, 0.480, 0.520, 0.560, 0.600, 0.640, 0.651, 0.680, 0.702, 0.720,
-						    0.747, 0.760, 0.781, 0.792, 0.796, 0.800, 1.000 };
-static double session_frac[SESSION_FRAC_SIZE] = { 0.006, 0.011, 0.022, 0.032, 0.043, 0.055, 0.070, 0.086, 0.106, 0.131,
-						    0.159, 0.192, 0.231, 0.275, 0.326, 0.383, 0.400, 0.456, 0.500, 0.538,
-						    0.600, 0.637, 0.700, 0.753, 0.800, 1.000, 1.000 };
-#else
-
 #define SESSION_FRAC_SIZE 20
 static double session_frac_cdf[SESSION_FRAC_SIZE] = { 0.050, 0.100, 0.150, 0.200, 0.250, 0.300, 0.350, 0.400, 0.450, 0.500,
 							0.550, 0.600, 0.650, 0.700, 0.750, 0.800, 0.820, 1.000 };
 static double session_frac[SESSION_FRAC_SIZE] = { 0.067, 0.122, 0.174, 0.222, 0.277, 0.352, 0.439, 0.537, 0.627, 0.673,
 							0.708, 0.738, 0.783, 0.835, 0.905, 0.982, 1.000, 1.000 };
 
-#endif
 #define SESSION_FRAC_HISTOGRAM_SIZE 1000
 #define SESSION_FRAC_HISTOGRAM_BINSIZE  0.001
 static int session_frac_histogram[SESSION_FRAC_HISTOGRAM_SIZE];
@@ -401,11 +259,6 @@ static double compute_session_frac( double r )
     double frac;
 
     frac = interpolate_cdf( r, session_frac_cdf, session_frac, SESSION_FRAC_SIZE );
-
-#ifdef FULL_SESSIONS
-    /* make all sessions last the full duration */
-    frac = 1.0;
-#endif
 
     /* update duration histogram */
     i = frac / SESSION_FRAC_HISTOGRAM_BINSIZE;
@@ -473,7 +326,6 @@ static fileset_info_struct *create_video_library( int lib_size )
     double video_dur_histogram_bin_size;
     int *dur_cdf;
 
-    init_compute_duration();
 
     /* construct duration histograms for subsets of the distribution */
     num_dur_histogram = 3;
@@ -496,15 +348,6 @@ static fileset_info_struct *create_video_library( int lib_size )
     /* use extra histogram sample at end to store aggregate values */
     total_dur_histogram = dur_histogram_sample + num_dur_histogram;
 
-#ifdef POPULAR_DUR
-    /* write out popularity and duration for each rank */
-    if ((f = fopen( "popular_dur.txt", "w" )) == NULL) {
-	printf( "Error opening file %d\n", errno );
-	exit( 1 );
-    }
-    fprintf( f, "# video_duration num_sessions\n" );
-#endif
-
     if ((fsi = malloc( sizeof( fileset_info_struct ) )) == NULL) {
 	printf( "Unable to allocate library information array.\n" );
 	exit( 1 );
@@ -514,13 +357,6 @@ static fileset_info_struct *create_video_library( int lib_size )
 	exit( 1 );
     }
     fsi->num_files = lib_size;
-    /*
-#ifdef HD_VIDEO
-    fsi->li = &(logfile_info[ HD_LIBRARY ]);
-#else
-    fsi->li = &(logfile_info[ SD_LIBRARY ]);
-#endif
-    */
     fsi->li = &(logfile_info[ video_quality ]);
     fsi->file_MB_rate = fsi->li->client_MB_per_request / fsi->li->file_seconds_per_request;
 
@@ -552,16 +388,8 @@ static fileset_info_struct *create_video_library( int lib_size )
 	    j += dur_histogram_sample_size;
 	}
 
-#ifdef POPULAR_DUR
-	/* for each rank, output duration, popularity of the rank and cumulative */
-	/* totals of the number of sessions and size required to store data */
-	fprintf( f, "%.3f %d\n", fsi->fi[i].video_dur, rank_views[i].num_views );
-#endif
     }
     assert( total_dur_histogram->size == lib_size );
-#ifdef POPULAR_DUR
-    fclose( f );
-#endif
     average_video_MB = total_duration / lib_size * fsi->file_MB_rate;
 
     /* write out the file duration CDF */
@@ -724,14 +552,7 @@ static fileset_info_struct *read_video_library( const char *filename, logfile_in
 	lib_size++;
     }
 
-#ifdef CREATE_FULL_LIBRARY
-    if (library_size > lib_size)
-	num_files = library_size;
-    else
-	num_files = lib_size;
-#else
     num_files = lib_size;
-#endif
     if (video_count != NULL)
 	*video_count = num_files;
 
@@ -807,20 +628,6 @@ static fileset_info_struct *read_video_library( const char *filename, logfile_in
     /* write out the file duration CDF */
     write_file_duration_CDF();
 
-#ifdef CREATE_FULL_LIBRARY
-    /* fill out rest of library with random durations if necessary */
-    if (i < num_files) {
-	do {
-	    fsi->fi[i].file_number = i;
-	    fsi->fi[i].video_dur = compute_duration( random() / (1.0 + INT_MAX) );
-	    fsi->fi[i].size = fsi->fi[i].video_dur * fsi->file_MB_rate * BYTES_PER_MB;
-	    total_duration += fsi->fi[i].video_dur;
-	} while (++i < num_files);
-
-	/* create new random permutation that includes the new video durations */
-	create_random_ranks( fsi );
-    }
-#endif
     average_video_MB = total_duration / num_files * fsi->file_MB_rate;
 
     return( fsi );
@@ -859,27 +666,11 @@ static void make_video_index( fileset_info_struct *fsi )
     }
 }
 
-/*
- * Select a random fileset to supply the file for a session.
- * The client_id is supplied in case we need to worry about
- * the bandwidth supplied to different clients.
- */
-static int compute_fileset( int client_id )
-{
-    /* return 1 (an HD file) with with specified probability */
-    if (num_filesets > 1 && random() > (INT_MAX * MIXED_SD_PROBABILITY)) {
-	return( 1 );
-    }
-    else {
-	return( 0 );
-    }
-}
 
 int main(int argc, char *argv[])
 {
     int rank;
     int i, j;
-    char *c;
     double duration;
     double *max_session_time;
     double *sum_session_time;
@@ -924,33 +715,11 @@ int main(int argc, char *argv[])
 	make_video_index( fileset_list[0] );
 	num_videos = library_size;
 	
-	/*
-#ifdef HD_VIDEO
-	fileset_list[0]->li = &(logfile_info[ HD_LIBRARY ]);
-#else
-	fileset_list[0]->li = &(logfile_info[ SD_LIBRARY ]);
-#endif
-	*/
 	fileset_list[0]->li = &(logfile_info[ video_quality ]);
     }
     else {
 	for (i=0;i<num_filesets;++i) {
 
-	    /* examine fileset name to determine what logfile information to use */
-	    c = argv[i+1];
-	    /*
-	    j = SD_LIBRARY;
-	    while (*c) {
-		if (*c == 'H' && *(c + 1) == 'D') {
-		    j = HD_LIBRARY;
-		    break;
-		}
-		if (*c == 'S' && *(c + 1) == 'D') {
-		    j = SD_LIBRARY;
-		    break;
-		}
-		c++;
-		}*/
 	    log_info = &logfile_info[video_quality];
 
 	    if ((fileset_list[i] = read_video_library( argv[i+1], log_info, &num_videos )) == NULL) {
@@ -965,18 +734,6 @@ int main(int argc, char *argv[])
     for (i=0;i<num_filesets;++i) {
 	make_video_index( fileset_list[i] );
 
-#ifdef SINGLE_REQUESTS
-	if ((fileset_list[i]->permutation = malloc( fileset_list[i]->num_files * sizeof( int ) )) == NULL) {
-	    printf( "Unable to allocate rank permutation array.\n" );
-	    exit( 1 );
-	}
-	int j,n;
-	for (n=0;n < fileset_list[i]->num_files;++n) {
-	    j = random() / (1.0 + INT_MAX) * (n+1);
-	    fileset_list[i]->permutation[n] = fileset_list[i]->permutation[j];
-	    fileset_list[i]->permutation[j] = n;
-	}
-#else
 	/* setup popularity distribution */
 	if ((fileset_list[i]->pdf = malloc( fileset_list[i]->num_files * sizeof( double ) )) == NULL) {
 	    printf( "Unable to allocate rank pdf array.\n" );
@@ -984,7 +741,6 @@ int main(int argc, char *argv[])
 	}
 	make_zipf_distribution( fileset_list[i]->pdf, fileset_list[i]->num_files );
 	/* make_weibull_distribution( fileset_list[i]->pdf, fileset_list[i]->num_files ); */
-#endif
     }
 
     /* statistics about the number of views for each video */
@@ -1031,24 +787,11 @@ int main(int argc, char *argv[])
 	session_info[i].client_id = i % num_log_files;
 
 	/* choose fileset */
-	fs_num = compute_fileset( session_info[i].client_id );
+	fs_num = 0; 
 	fileset_info = fileset_list[fs_num];
     	session_info[i].fsi = fileset_info;
 	svs = &session_viewstats[fs_num];
 
-#ifdef SINGLE_REQUESTS
-	/* assign videos in the order of the permutation */
-        //printf("number of unique files = %d", svs->num_unique);
-        if (svs->num_unique > fileset_info->num_files) {
-	    printf( "Not enough videos in file set (%d) to represent all unique videos (%d).\n",
-			fileset_info->num_files, svs->num_unique  );
-	    exit( 1 );
-	}
-        rank = fileset_info->permutation[svs->num_unique];
-
-	/* keep track of the number of videos assigned so far */
-	svs->num_unique++;
-#else
 	double p;
 
         /* pick a random number and use to pick a sample rank */
@@ -1067,21 +810,9 @@ int main(int argc, char *argv[])
         else if (svs->rank_views[rank].num_views == 1) {
             svs->num_multi++;
         }
-#endif
         session_info[i].rank = rank;
         svs->rank_views[rank].num_views++;
     }
-
-#ifdef OLDWAY
-    /* The number of unique videos must be less than the number of videos in the library */
-    if (num_unique > num_videos) {
-	printf( "Not enough videos in file set (%d) to represent all unique videos (%d).\n",
-		num_videos, num_unique );
-	printf( "Try reducing the library size from %d, or using a different fileset.\n",
-		library_size );
-	exit( 1 );
-    } 
-#endif
 
     rank_struct *rank_unsorted;
     char dist_filename[100];
@@ -1156,11 +887,6 @@ int main(int argc, char *argv[])
 	total_num_multi += svs->num_multi;
     } /* for (fs_num=0;fs_num<num_filesets;++fs_num) */
 
-    /* now that the ranks are sorted, we can ignore the ranks at the end */
-    /* that were never viewed.						 */
-//#ifndef CREATE_FULL_LIBRARY
-//    num_videos = num_unique;
-//#endif
 
     /* track the number of sessions of each length (up to 1000 seconds) */
 #define SESSION_HISTOGRAM_SIZE 1000
@@ -1575,11 +1301,6 @@ static int create_log_files( session_info_struct *session_info, int total_num_vi
     int single_chunk;
     int num_chunks_used;
     logfile_info_struct *log_info;
-#ifdef RAMP_DOWN
-    int ramp_down_sess_idx;
-    double ramp_max_session;
-    double ramp_max_decr;
-#endif
 
     if ((num_log_requests = calloc( num_log_files, sizeof( int ) )) == NULL) {
 	printf( "Unable to allocate num_log_requests array.\n" );
@@ -1610,16 +1331,6 @@ static int create_log_files( session_info_struct *session_info, int total_num_vi
 	request_info[i].owner_rank = fileset_list[0]->video_rank[i];
     }
 
-#ifdef RAMP_DOWN
-    /* determine which session to start ramping on */
-    ramp_down_sess_idx = ramp_down_frac * num_log_sessions;
-
-    /* ramp down to 10% of max session at end */
-    if (num_log_sessions > ramp_down_sess_idx)
-	ramp_max_decr = 0.9 * max_session / (num_log_sessions - ramp_down_sess_idx);
-    else
-	ramp_max_decr = 0.0;
-#endif
 
     /* create log files to hold the requests. */
     double timeout;
@@ -1648,9 +1359,6 @@ static int create_log_files( session_info_struct *session_info, int total_num_vi
 	fprintf( f, "# average chunks per session in log file = %.2f\n",
 				(double) num_log_requests[i] / num_log_sessions );
 
-#ifdef RAMP_DOWN
-	ramp_max_session = max_session;
-#endif
 
 	/* go through session information, finding sessions for this client */
 	s = 0;
@@ -1668,14 +1376,6 @@ static int create_log_files( session_info_struct *session_info, int total_num_vi
 	    /* determine video file number and time for session */
 	    file_number = session_info[s].fi->file_number;
 	    sess_time = session_info[s].duration;
-#ifdef RAMP_DOWN
-	    if (j > ramp_down_sess_idx) {
-		ramp_max_session -= ramp_max_decr;
-		if (sess_time > ramp_max_session) {
-		     sess_time = ramp_max_session;
-		}
-	    }
-#endif
 
 	    /* adjust timeout based on session time */
 	    if (timeout_per_request > sess_time) {
@@ -1828,30 +1528,4 @@ next_client:
     return( 0 );
 }
 
-#ifdef OLDWAY
-/*
- * Fill the sample array with a Weibull probability distribution.
- */
-static void make_weibull_distribution( double *sample, int num_ranks )
-{
-    double k = 0.57;
-    double lambda = 2000.0;
-    double m,r;
-    double rank_total;
-    int rank;
 
-    /* create Weibull distribution */
-    m = k / lambda;
-    rank_total=0.0;
-    for (rank=0; rank < num_ranks; ++rank) {
-	r = (rank + 1) / lambda;
-	sample[rank] = m * pow( r, k - 1.0 ) / exp( pow( r, k ) );
-        rank_total += sample[rank];
-    }
-
-    /* normalize distribution to compute probabilities */
-    for (rank=0; rank < num_ranks; ++rank) {
-	sample[rank] /= rank_total;
-    }
-}
-#endif
