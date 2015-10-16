@@ -202,15 +202,16 @@ void read_config()
 			} else if (i==2) {
 				num_log_sessions = atoi(cfline);
 			} else if (i==3) {
-				if(strcmp(cfline, "1080p") == 0) {
+				printf("quality = %s %d\n", cfline, strcmp(cfline, "240p"));
+				if(strncmp(cfline, "1080p", 5) == 0) {
 					video_quality=2;
-				} else if(strcmp(cfline, "720p") == 0) {
+				} else if(strncmp(cfline, "720p", 4) == 0) {
 					video_quality=3;
-				} else if(strcmp(cfline, "480p") == 0) {
+				} else if(strncmp(cfline, "480p", 4) == 0) {
 					video_quality=4;
-				} else if(strcmp(cfline, "360p") == 0) {
+				} else if(strncmp(cfline, "360p", 4) == 0) {
 					video_quality=5;
-				} else if(strcmp(cfline, "240p") == 0) {
+				} else if(strncmp(cfline, "240p", 4) == 0) {
 					video_quality=6;
 				}
 			}
