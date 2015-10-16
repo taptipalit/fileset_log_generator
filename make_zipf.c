@@ -121,7 +121,7 @@ logfile_info_struct logfile_info[] = {
 #define Q240P 6
 #define Q144P 7
 
-int video_quality = Q720P;
+int video_quality = Q480P;
 
 /* information about each file in a fileset */
 struct fs_info_struct;
