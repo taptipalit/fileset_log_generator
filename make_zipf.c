@@ -124,6 +124,7 @@ logfile_info_struct logfile_info[] = {
 #define Q144P 7
 
 int video_quality = Q480P;
+char video_quality_str[10] = "480p";
 
 
 /* information about each file in a fileset */
@@ -205,14 +206,19 @@ void read_config()
 				printf("quality = %s %d\n", cfline, strcmp(cfline, "240p"));
 				if(strncmp(cfline, "1080p", 5) == 0) {
 					video_quality=2;
+					strcpy(video_quality_str, "1080p");
 				} else if(strncmp(cfline, "720p", 4) == 0) {
 					video_quality=3;
+					strcpy(video_quality_str, "720p");
 				} else if(strncmp(cfline, "480p", 4) == 0) {
 					video_quality=4;
+					strcpy(video_quality_str, "480p");
 				} else if(strncmp(cfline, "360p", 4) == 0) {
 					video_quality=5;
+					strcpy(video_quality_str, "360p");
 				} else if(strncmp(cfline, "240p", 4) == 0) {
 					video_quality=6;
+					strcpy(video_quality_str, "240p");
 				}
 			}
 			i++;
@@ -1387,7 +1393,7 @@ static int create_log_files( session_info_struct *session_info, int total_num_vi
     for (i=0; i < num_log_files; ++i) {
 
  	/* create a name like: cl-zipf4-2500-10-300-00.log */
-	snprintf( out_fname, sizeof( out_fname ), "%s-%d-%.0f-%.0f-%d-%02d.log", log_basename,
+	snprintf( out_fname, sizeof( out_fname ), "%s-%s-%d-%.0f-%.0f-%d-%02d.log", log_basename, video_quality_str,
 				num_videos, 5000.0 / fileset_list[0]->li->client_MB_per_request,
 				fileset_list[0]->li->file_seconds_per_request, num_log_sessions, i );
         f = fopen( out_fname, "w" );
