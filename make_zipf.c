@@ -43,7 +43,10 @@
 /* adjust chunk size by plus or minus this fraction */
 #define VBR_FACTOR (0.1)
 
-
+/* For reading the config file */
+#define CONFIG_FILENAME "filegen_param.conf"
+#define CONFIG_MAXBUF 1024
+#define CONFIG_DELIM "="
 
 /* user-supplied parameters */
 static unsigned long random_seed = 40;
@@ -64,7 +67,6 @@ static int num_client_chunks_requested;		/* total number of client chunk request
 
 static double max_duration = 800;		/* video library durations are truncated to this value when read */
 static double max_session;			/* duration of the longest session that was used, in seconds */
-
 
 /* start requests from an offset other than 0.  If FIXED, add a */
 /* fixed amount.  If MIDPOINT, make request out of the middle of */
@@ -123,6 +125,7 @@ logfile_info_struct logfile_info[] = {
 
 int video_quality = Q480P;
 
+
 /* information about each file in a fileset */
 struct fs_info_struct;
 typedef struct {
@@ -177,6 +180,45 @@ static double video_duration[VIDEO_DUR_SIZE] = { 15, 30, 50, 70, 90, 112, 138, 1
 						215, 228, 244, 257, 285, 300, 362, 400, 500, 600,
 						700, 800, 900, 1000, 1000 };
 
+
+/*
+ * Read the config file, if present.
+ */
+void read_config()
+{
+	FILE *f = fopen(CONFIG_FILENAME, "r");
+	if (f != NULL) {
+		char line[CONFIG_MAXBUF];
+		int i = 0;
+		while(fgets(line, sizeof(line), f) != NULL) {
+			char* cfline;
+			cfline = strstr((char*)line, CONFIG_DELIM);
+			cfline = cfline + strlen(CONFIG_DELIM);
+
+			if (i==0) {
+				library_size = atoi(cfline);				
+			} else if (i==1) {
+				num_log_files = atoi(cfline);				
+			} else if (i==2) {
+				num_log_sessions = atoi(cfline);
+			} else if (i==3) {
+				if(strcmp(cfline, "1080p") == 0) {
+					video_quality=2;
+				} else if(strcmp(cfline, "720p") == 0) {
+					video_quality=3;
+				} else if(strcmp(cfline, "480p") == 0) {
+					video_quality=4;
+				} else if(strcmp(cfline, "360p") == 0) {
+					video_quality=5;
+				} else if(strcmp(cfline, "240p") == 0) {
+					video_quality=6;
+				}
+			}
+			i++;
+		}
+		fclose(f);
+	}
+}
 
 /*
  * Find the first cdf value higher than r. Interpolate r between the two straddling
@@ -684,6 +726,8 @@ int main(int argc, char *argv[])
     fileset_info_struct *fileset_info;
     session_info_struct *session_info;
     logfile_info_struct *log_info;
+
+    read_config();
 
     /* create text file that can be used for gnuplot titles */
     if ((f = fopen( "make_zipf_description.txt", "w" )) == NULL) {
