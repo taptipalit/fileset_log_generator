@@ -1415,14 +1415,17 @@ static int create_log_files( session_info_struct *session_info, int total_num_vi
 	s = 0;
 	for (;;) {
 
+	    if (++s >= num_sessions) {
+		break;
+	    }
 	    /* find next session with matching client */
-	    while (session_info[s].client_id != i) {
-		if (++s >= num_sessions) {
+	    //while (session_info[s].client_id != i) {
+		if (s >= num_sessions) {
 
 		    /* break out of this loop and outer loop */
 		    goto next_client;
 		}
-	    }
+	    //}
 
 	    /* determine video file number and time for session */
 	    file_number = session_info[s].fi->file_number;
